@@ -1,0 +1,57 @@
+This lab demonstrates how to implement NAT (Network Address Translation) in a small office environment.
+We will see how private IP addresses are translated into a public IP, allowing internal devices to communicate with a server representing the Internet.
+
+Devices Used:
+Router 2911	1	NAT router, connects LAN to WAN
+Switch 2960	1	Connects PCs to Router
+PC 3	Internal office devices (private IPs)
+Server 1 Public server (represents Internet)
+
+PCs: LAN (192.168.10.x / 255.255.255.0)
+Router G0/0: LAN interface (inside NAT)
+Router G0/1: WAN interface (outside NAT, public IP)
+Server: Public network (200.10.10.10 / 255.255.255.0)
+
+LAN
+PC1	192.168.10.11	255.255.255.0	192.168.10.1 <- GATEWAY
+PC2	192.168.10.12	255.255.255.0	192.168.10.1 <- GATEWAY
+PC3	192.168.10.13	255.255.255.0	192.168.10.1 <- GATEWAY
+Router G0/0	192.168.10.1	255.255.255.0	-
+
+WAN
+Router G0/1	200.10.10.2	255.255.255.0
+Server	200.10.10.10	255.255.255.0
+
+ROUTER CLI
+Router(config)# interface g0/0
+Router(config-if)# ip address 192.168.10.1 255.255.255.0   ! Assign LAN IP
+Router(config-if)# no shutdown                                  ! Activate interface
+Router(config-if)# ip nat inside                                   ! Mark as NAT inside
+Router(config-if)# exit
+
+Router(config)# interface g0/1
+Router(config-if)# ip address 200.10.10.2 255.255.255.0      ! Assign public IP
+Router(config-if)# no shutdown                                  ! Activate interface
+Router(config-if)# ip nat outside                                  ! Mark as NAT outside
+Router(config-if)# exit
+
+Router(config)# access-list 1 permit 192.168.10.0 0.0.0.255   ! Allow LAN subnet for NAT       
+Router(config)# ip nat inside source list 1 interface g0/1 overload   ! Map all private IPs to single public IP
+
+Router# show ip nat translations
+(Image1)
+Pro ->	Protocol (ICMP, TCP, UDP)
+Inside Global ->	The public IP (and port/ICMP ID) seen by the outside network
+Inside Local ->	The private IP (and port/ICMP ID) of the internal PC
+Outside Local ->	IP/port of the server as the router sees it (same as Outside Global for this lab)
+Outside Global ->	The actual IP/port of the server on the public network
+
+How it works?
+Router maps Inside Local → Inside Global (private → public IP)
+When a reply comes from the server, router uses port/ICMP ID to know which PC to forward it to
+Multiple PCs can share the same public IP using different ports / ICMP IDs
+
+Only active translations appear in NAT table. If a PC does not send traffic, it will not be listed.
+NAT/PAT allows multiple internal devices to share one public IP.
+ICMP uses sequence numbers/IDs instead of TCP/UDP ports.                                                              
+       
